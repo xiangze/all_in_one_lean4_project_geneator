@@ -1,0 +1,156 @@
+# Makefile — Lean4/Lake 分割ビルド
+# 変数:
+#   PROJ         : プロジェクト名（実行ターゲット名の元） 例: myproject
+#   USE_MATHLIB  : mathlib を使うなら 1、使わないなら 0（既定 0）
+#   SRC          : 外部 Lean ファイルのパス（省略可）
+#   AS           : 取り込み先モジュール名（省略時 Math）
+#
+# 例:
+#   make create PROJ=myproject USE_MATHLIB=1
+#   make create PROJ=myproject SRC=./foo/Fibo.lean AS=Fibo
+#   make update && make cache && make build && make run
+
+SHELL := /usr/bin/env bash
+.SHELLFLAGS := -eu -o pipefail -c
+
+LAKE ?= lake
+PROJ ?= myproject
+USE_MATHLIB ?= 0
+SRC ?=
+AS ?=
+
+# --- 正規化（実行ターゲット名 / package名 / lib名 パスカルケース） -------------
+# EXE: 英数_のみ/先頭数字なら x を付与
+EXE := $(shell bash -c 's="$(PROJ)"; s="$${s//[^A-Za-z0-9_]/_}"; [[ "$$s" =~ ^[A-Za-z_][A-Za-z0-9_]*$$ ]] || s="x$$s"; printf "%s" "$$s"')
+# パッケージ名は小文字
+PKG := $(shell bash -c 'printf "%s" "$(EXE)" | tr "[:upper:]" "[:lower:]"')
+# PascalCase 化（ライブラリ/モジュール名用）
+to_pascal = bash -c 's="$${1//[- ]/_}"; awk -F"_" '\''BEGIN{ORS=""} {for(i=1;i<=NF;i++) if($$i!="") printf toupper(substr($$i,1,1)) tolower(substr($$i,2));} END{print ""}'\'' <<<"$$s"' _
+
+LIB := $(shell $(to_pascal) "$(PKG)")
+
+# 内部ユーティリティ
+define mk_here
+echo "==> PKG=$(PKG)  LIB=$(LIB)  EXE=$(EXE)  USE_MATHLIB=$(USE_MATHLIB)  SRC=$(SRC)  AS=$(AS)";
+# 取り込み先モジュール名の決定
+if [[ -n "$(SRC)" ]]; then \
+  dst="$(AS)"; [[ -n "$$dst" ]] || dst=Math; \
+  DST_MOD="$$( $(to_pascal) "$$dst" )"; \
+else \
+  DST_MOD=""; \
+fi; \
+# 生成物が既にある時は保護
+if [[ -e lakefile.lean || -e Main.lean ]] && [[ "${FORCE:-0}" != "1" ]]; then \
+  echo "ERROR: lakefile.lean / Main.lean が既にあります。上書きする場合は FORCE=1 を指定してください。"; \
+  exit 1; \
+fi; \
+# SRC があるならコピー
+if [[ -n "$(SRC)" ]]; then \
+  [[ -f "$(SRC)" ]] || { echo "ERROR: SRC '$(SRC)' not found"; exit 1; }; \
+  cp "$(SRC)" "$$DST_MOD.lean"; \
+  DETECT_MATHLIB=0; \
+  if grep -qE '^[[:space:]]*import[[:space:]]+Mathlib(\.|[[:space:]]|$$)' "$$DST_MOD.lean"; then DETECT_MATHLIB=1; fi; \
+  # main/run の有無で root と wrapper 方針を決定
+  ROOT=""; WRAP=0; CALL_RUN=0; \
+  if grep -qE '^[[:space:]]*def[[:space:]]+main\b' "$$DST_MOD.lean"; then \
+    ROOT="$$DST_MOD"; \
+  else \
+    ROOT="Main"; WRAP=1; \
+    if grep -qE '^[[:space:]]*def[[:space:]]+run\b' "$$DST_MOD.lean"; then CALL_RUN=1; fi; \
+  fi; \
+  # lakefile.lean を生成
+  { \
+    echo "import Lake"; echo "open Lake DSL"; echo; \
+    echo "package «$(PKG)» where"; echo; \
+    echo "lean_lib «$(LIB)» where"; echo; \
+    echo; \
+    if [[ "$(USE_MATHLIB)" = "1" || "$$DETECT_MATHLIB" = "1" ]]; then \
+      echo 'require mathlib from git "https://github.com/leanprover-community/mathlib4.git"'; echo; \
+    fi; \
+    echo "lean_exe $(EXE) where"; \
+    echo "  root := \`$$ROOT"; \
+  } > lakefile.lean; \
+  # 必要なら wrapper Main.lean を生成
+  if [[ "$$WRAP" = "1" ]]; then \
+    if [[ "$$CALL_RUN" = "1" ]]; then \
+      { echo "import $$DST_MOD"; echo "def main : IO Unit := $$DST_MOD.run"; } > Main.lean; \
+    else \
+      { echo "import $$DST_MOD"; echo 'def main : IO Unit := do'; echo '  IO.println s!"Imported '"$$DST_MOD"' (no main/run)".'; } > Main.lean; \
+    fi; \
+  fi; \
+else \
+  # SRC が無い場合：テンプレ生成
+  { \
+    echo "import Lake"; echo "open Lake DSL"; echo; \
+    echo "package «$(PKG)» where"; echo; \
+    echo "lean_lib «$(LIB)» where"; echo; \
+    echo; \
+    if [[ "$(USE_MATHLIB)" = "1" ]]; then \
+      echo 'require mathlib from git "https://github.com/leanprover-community/mathlib4.git"'; echo; \
+    fi; \
+    echo "lean_exe $(EXE) where"; \
+    echo "  root := \`Main"; \
+  } > lakefile.lean; \
+  if [[ "$(USE_MATHLIB)" = "1" ]]; then \
+    { \
+      echo "import Mathlib"; \
+      echo "open Nat"; \
+      echo "open scoped BigOperators"; \
+      echo "def main : IO Unit := do"; \
+      echo '  IO.println s!"fib 10 = {Nat.fib 10}"'; \
+      echo '  IO.println s!"fib 12 = {Nat.fib 12}"'; \
+    } > Main.lean; \
+  else \
+    { echo 'def main : IO Unit := IO.println "Hello from $(EXE)"'; } > Main.lean; \
+  fi; \
+fi; \
+echo "generated: lakefile.lean  $$( [[ -f Main.lean ]] && echo 'Main.lean' || true )"; \
+true
+endef
+
+.PHONY: create update cache build buidl run vars clean distclean
+
+## 1) lakefile.lean / Main.lean の生成
+create:
+	@$(mk_here)
+
+## 2) 依存解決（lake-manifest.json の更新など）
+update:
+	@$(LAKE) update
+
+## 3) mathlib の olean キャッシュ（lakefile に mathlib が宣言されていれば実行）
+cache:
+	@if grep -q 'require mathlib' lakefile.lean 2>/dev/null; then \
+	  echo "+ $(LAKE) exe cache get"; \
+	  $(LAKE) exe cache get; \
+	else \
+	  echo "(skip) mathlib 未使用のため cache は不要"; \
+	fi
+
+## 4) ビルド
+build:
+	@$(LAKE) build
+
+## 誤字互換
+buidl: build
+
+## 5) 実行（lean_exe 名＝正規化済み EXE）
+run:
+	@$(LAKE) exe $(EXE)
+
+## デバッグ用：正規化後の名前たちを表示
+vars:
+	@echo "PROJ=$(PROJ)"
+	@echo "EXE=$(EXE)"
+	@echo "PKG=$(PKG)"
+	@echo "LIB=$(LIB)"
+	@echo "USE_MATHLIB=$(USE_MATHLIB)"
+	@echo "SRC=$(SRC)"
+	@echo "AS=$(AS)"
+
+## お掃除
+clean:
+	@rm -rf build
+
+distclean: clean
+	@rm -rf .lake lake-manifest.json
