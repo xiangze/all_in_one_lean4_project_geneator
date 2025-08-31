@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# mklean.sh — Lean4/Lake プロジェクト作成 & 実行
+# all_in_one_generator.sh — Lean4/Lake プロジェクト作成 & 実行
 # 外部 Lean ファイルを取り込む --src / --as, mathlib 切替 -m/--mathlib
 
 set -Eeuo pipefail
@@ -16,7 +16,7 @@ while [[ $# -gt 0 ]]; do
     --as)  AS_MOD="${2:-}"; shift 2 ;;
     -h|--help)
       cat <<'USAGE'
-Usage: mklean.sh [-m|--mathlib] [--src FILE] [--as ModuleName] <project_name>
+Usage: ./all_in_one_generator.sh [-m|--mathlib] [--src FILE] [--as ModuleName] <project_name>
 
   -m, --mathlib     : mathlib を依存に追加（cache get も実行）
   --src FILE        : 外部 Lean ファイルをプロジェクトへ取り込み
