@@ -1,13 +1,12 @@
-# leantest
+# All-in-One lean4 project generator & build & runner
 
-## GitHub configuration
+## Usage
+#without mathlib
+> ./all_in_one_generator.sh proj  
+#with mathlib
+> ./all_in_one_generator.sh proj1_math -m  --SRC fibonacci.lean 
 
-To set up your new GitHub repository, follow these steps:
+## Document (Japanese)
+https://zenn.dev/xiangze/articles/24d33f3ebabfa0
 
-* Under your repository name, click **Settings**.
-* In the **Actions** section of the sidebar, click "General".
-* Check the box **Allow GitHub Actions to create and approve pull requests**.
-* Click the **Pages** section of the settings sidebar.
-* In the **Source** dropdown menu, select "GitHub Actions".
 
-After following the steps above, you can remove this section from the README file.
