@@ -33,11 +33,7 @@ theorem hoeffding_finset
   (hIndep : iIndepFun X μ)
   {ε : ℝ} (hε : 0 ≤ ε) :
   μ.real {ω | ε ≤ ∑ i ∈ s, X i ω}
-    ≤ Real.exp
-        (-
-          ε ^ 2 /
-            (2 * (↑(∑ i ∈ s, ((‖b i - a i‖₊ / 2) ^ 2 : NNReal))))) := by
-  classical
+    ≤ Real.exp(- ε ^ 2 / (2 * (↑(∑ i ∈ s, ((‖b i - a i‖₊ / 2) ^ 2 : NNReal))))) := by  classical
   -- Each summand is sub-Gaussian with parameter (‖b-a‖₊/2)^2 (Hoeffding's lemma).
   have hSub :
       ∀ i ∈ s, HasSubgaussianMGF (X i) ((‖b i - a i‖₊ / 2) ^ 2) μ := by
@@ -67,9 +63,7 @@ theorem hoeffding_sum_range
   {ε : ℝ} (hε : 0 ≤ ε) :
   μ.real {ω | ε ≤ ∑ i ∈ Finset.range n, X i ω}
     ≤ Real.exp (-
-        ε ^ 2 /
-          (2 * (n : ℝ) *
-            (↑(((‖b - a‖₊) / 2) ^ 2 : NNReal)))) := by
+        ε ^ 2 / (2 * (n : ℝ) *  (↑(((‖b - a‖₊) / 2) ^ 2 : NNReal)))) := by
   classical
   -- common sub-Gaussian parameter
   set c : NNReal := ((‖b - a‖₊ / 2) ^ 2)
