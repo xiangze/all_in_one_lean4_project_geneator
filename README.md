@@ -12,9 +12,13 @@ Usage: ./all_in_one_generator.sh [-m|--mathlib] [--src FILE] [--as ModuleName] <
 ```
 ### Example
 #without mathlib
-> ./all_in_one_generator.sh proj  
+```
+ ./all_in_one_generator.sh proj
+```
 #with mathlib
-> ./all_in_one_generator.sh proj1_math -m  --SRC fibonacci.lean 
+```
+ ./all_in_one_generator.sh proj1_math -m  --SRC fibonacci.lean 
+```
 
 ## Document (Japanese)
 https://zenn.dev/xiangze/articles/24d33f3ebabfa0
